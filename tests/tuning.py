@@ -27,13 +27,16 @@ def run_hyperparameter_tuning_test():
                             'n_estimators': [100, 200, 500],
                             'max_depth': [3, 5, 8, 10, None],},
                         "NN": {  
-                            'hidden_layer_sizes': [(50,), (100,), (100, 50), (100, 100)],
-                            'activation': ['relu', 'tanh', 'logistic'],
-                            'solver': ['adam', 'sgd'],
+                            'hidden_layer_sizes': [(50,), (100,), (100, 50)],
+                            'activation': ['relu', 'tanh'],
                             'alpha': [0.0001, 0.001, 0.01],
-                            'learning_rate': ['constant', 'adaptive'],
-                            'max_iter': [1000, 1500], 
-                            'learning_rate_init': [0.001, 0.0001] 
+                            'max_iter': [500, 1000]
+                          },
+                        "XGB": {
+                            'n_estimators': [100, 200, 300],
+                            'max_depth': [3, 5, 7],
+                            'learning_rate': [0.01, 0.1, 0.2],
+                            'subsample': [0.8, 1.0]
                           }
     }
     df_hyp = pd.DataFrame()
@@ -41,7 +44,7 @@ def run_hyperparameter_tuning_test():
     target_columns_clf = []
     target_columns = []
 
-    target_ds_list = additional_15_ds
+    target_ds_list = ds_list
     print("Datasets to be used: ", target_ds_list)
 
     print("HiperParameter")
@@ -62,6 +65,7 @@ def run_hyperparameter_tuning_test():
         p_grid = hyperparameterDict[alg]
 
         for i in range(NUM_TRIALS):
+            print("\n Trial: ", i+1, " of ", NUM_TRIALS,"\n")
             train_data = df.drop('target', axis=1)
             train_target = df['target']
             inner_cv = StratifiedKFold(n_splits=4, shuffle=True, random_state=i)
@@ -93,4 +97,4 @@ def run_hyperparameter_tuning_test():
             df_hyp = pd.concat([df_hyp,df_temp], ignore_index=True)
             print("CV scores (with data leakage) ",alg, " in ", ds, ": ", cv_scores_leak[i])
             print("CV scores (without data leakage) ",alg, " in ", ds, ": ", cv_scores_noleak[i])
-            df_hyp.to_csv("hyperparameter_tuning_results.csv", index=False)
+            df_hyp.to_csv("hyperparameter_tuning_results"+suffix+".csv", index=False)

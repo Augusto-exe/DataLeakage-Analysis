@@ -7,7 +7,7 @@ def signal_handler(sig, frame):
 
 signal.signal(signal.SIGINT, signal_handler)
 
-
+suffix = "_xgb_NN"
 # Standard library imports
 import random
 from typing import List, Dict, Union
@@ -18,9 +18,11 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import torch
+import xgboost as xgb
 
 # Scikit-learn imports
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, LabelEncoder
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.experimental import enable_iterative_imputer  # Required for IterativeImputer
 from sklearn.impute import SimpleImputer, IterativeImputer, KNNImputer
 from sklearn.pipeline import Pipeline
@@ -68,16 +70,71 @@ from matplotlib.axes._axes import Axes
 print("Starting model script...")
 
 #"LR",
-target_algorithms = ["KNN",  "LR", "NB","DT", "RF", "SVC"] #"SVC",
+target_algorithms = ["KNN",  "LR", "NB","DT", "RF", "SVC"] #
+
+# New algorithms for additional testing
+new_algorithms = ["XGB", "NN"]
 
 sub_ds_list = ["GAMETES_Epistasis_2_Way_1000atts_0.4H_EDM_1_EDM_1_1","agaricus_lepiota","mushroom","ring","twonorm"]
 partial_ds = ["waveform_40","waveform_21","movement_libras","satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
-ds_list = ["GAMETES_Epistasis_2_Way_1000atts_0.4H_EDM_1_EDM_1_1","agaricus_lepiota","mushroom","ring","twonorm","clean1","dna","phoneme","mfeat_pixel","banana","mfeat_factors","spambase","Hill_Valley_with_noise","Hill_Valley_without_noise","waveform_40","waveform_21","movement_libras","satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
+#ds_list = ["optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
+#ds_list = ["GAMETES_Epistasis_2_Way_1000atts_0.4H_EDM_1_EDM_1_1","agaricus_lepiota","mushroom","ring","twonorm","clean1","dna","phoneme","mfeat_pixel","banana","mfeat_factors","spambase","Hill_Valley_with_noise","Hill_Valley_without_noise","waveform_40","waveform_21","movement_libras","satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
 additional_15_ds =  ["mnist", "poker", "kddcup","clean2", "coil2000", "connect_4", "sleep", "fars", "adult", "spectf", "shuttle", "magic", "letter", "krkopt", "dis"]
+
+ds_list =["kddcup","clean2", "coil2000", "connect_4", "sleep", "fars", "adult", "spectf", "shuttle", "magic", "letter", "krkopt", "dis"]
+#additional_15_ds
 #["mnist", "poker", "kddcup",
 new_list = ["satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
 #ds_list = new_list
 NUM_TRIALS = 6
+
+class XGBClassifierWrapper(BaseEstimator, ClassifierMixin):
+    """Wrapper for XGBClassifier that handles label encoding automatically"""
+    def __init__(self, **kwargs):
+        self.xgb_params = kwargs
+        self.model = xgb.XGBClassifier(**kwargs)
+        self.label_encoder = LabelEncoder()
+        self._fitted = False
+        
+    def fit(self, X, y, **fit_params):
+        # Encode labels to start from 0
+        y_encoded = self.label_encoder.fit_transform(y)
+        self.model.fit(X, y_encoded, **fit_params)
+        self._fitted = True
+        return self
+        
+    def predict(self, X):
+        if not self._fitted:
+            raise ValueError("Model must be fitted before prediction")
+        # Get predictions and decode back to original labels
+        y_pred_encoded = self.model.predict(X)
+        return self.label_encoder.inverse_transform(y_pred_encoded)
+        
+    def predict_proba(self, X):
+        if not self._fitted:
+            raise ValueError("Model must be fitted before prediction")
+        return self.model.predict_proba(X)
+    
+    def get_params(self, deep=True):
+        """Get parameters for this estimator."""
+        if deep:
+            return self.xgb_params.copy()
+        else:
+            return self.xgb_params
+    
+    def set_params(self, **params):
+        """Set the parameters of this estimator."""
+        self.xgb_params.update(params)
+        self.model = xgb.XGBClassifier(**self.xgb_params)
+        return self
+        
+    def __sklearn_is_fitted__(self):
+        """Check if the estimator is fitted."""
+        return self._fitted
+        
+    def __getattr__(self, name):
+        # Delegate other attributes to the underlying model
+        return getattr(self.model, name)
 
 def get_estimator(alg):
   if alg == "KNN":
@@ -92,6 +149,8 @@ def get_estimator(alg):
     return DecisionTreeClassifier(random_state=42)
   elif alg == "NN":
     return MLPClassifier(hidden_layer_sizes=(100,), max_iter=500, random_state=42)
+  elif alg == "XGB":
+    return XGBClassifierWrapper(random_state=42, eval_metric='logloss', verbosity=0)
   else:
     return RandomForestClassifier(random_state=42)
 

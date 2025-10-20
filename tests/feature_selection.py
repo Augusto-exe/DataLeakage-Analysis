@@ -9,7 +9,7 @@ from sklearn.feature_selection import SelectPercentile
 
 def run_feature_selection_test():
     print("Feature Selection")
-    target_ds_list = additional_15_ds
+    target_ds_list = ds_list
     print("Datasets to be used: ", target_ds_list)
 
     ## Version 2
@@ -21,6 +21,7 @@ def run_feature_selection_test():
 
       percentile_list = [1,5,10,20]
       scoring = get_scoring(df['target'].nunique())
+      target_algorithms = new_algorithms
       for alg in target_algorithms:
         print("alg: ",alg)
         for perc in percentile_list:
@@ -48,7 +49,7 @@ def run_feature_selection_test():
                 train_data, test_data, train_target, test_target = train_test_split(df.drop('target', axis=1), df['target'], test_size=0.2, random_state=i)
 
 
-                no_leak_feature_selector = SelectPercentile(percentile = perc)
+                no_leak_feature_selector = SelectPercentile(percentile = actual_perc)
                 train_no_leak = no_leak_feature_selector.fit_transform(train_data,train_target)
                 no_leak_model = estimator.fit(train_no_leak, train_target)
                 test_no_leak = no_leak_feature_selector.transform(test_data)
@@ -79,4 +80,4 @@ def run_feature_selection_test():
                 df_feat = pd.concat([df_feat,df_temp], ignore_index=True)
                 print("CV scores (with data leakage) ",alg, " in ", ds, ": ", cv_scores_leak[i])
                 print("CV scores (without data leakage) ",alg, " in ", ds, ": ", cv_scores_noleak[i])
-                df_feat.to_csv("feature_selection_results.csv", index=False)
+                df_feat.to_csv("feature_selection_results"+suffix+".csv", index=False)
