@@ -7,6 +7,7 @@ from sklearn.model_selection import StratifiedKFold, cross_validate, train_test_
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from imblearn.over_sampling import SMOTE
+import gc
 from imblearn.pipeline import Pipeline as ImbPipeline
 
 
@@ -71,6 +72,15 @@ def run_smote_test():
                         train_data = df.drop('target', axis=1)
                         train_target = df['target']
 
+                        # Define a minimum threshold for class size
+                        MIN_CLASS_SIZE = 10  # Adjust this threshold as needed
+
+                        # Filter out classes with fewer samples than the threshold
+                        class_counts = train_target.value_counts()
+                        valid_classes = class_counts[class_counts >= MIN_CLASS_SIZE].index
+                        train_data = train_data[train_target.isin(valid_classes)]
+                        train_target = train_target[train_target.isin(valid_classes)]
+
                         # Calculate safe k_neighbors for SMOTE (must be less than minority class size)
                         min_class_size = min(class_counts)
                         k_neighbors = min(5, max(1, min_class_size - 1))
@@ -92,67 +102,68 @@ def run_smote_test():
                         
                         cv = StratifiedKFold(n_splits=4, shuffle=True, random_state=i)
                     
-                    # No leakage: SMOTE applied within each CV fold
-                    cv_scores_noleak_all.append(
-                        make_dict_mean(
-                            df['target'].nunique(),
-                            cross_validate(pipeline_no_leak, train_data, train_target, 
-                                         cv=cv, scoring=scoring, return_train_score=False)
+                        # No leakage: SMOTE applied within each CV fold
+                        cv_scores_noleak_all.append(
+                            make_dict_mean(
+                                df['target'].nunique(),
+                                cross_validate(pipeline_no_leak, train_data, train_target, 
+                                            cv=cv, scoring=scoring, return_train_score=False)
+                            )
                         )
-                    )
 
-                    # WITH LEAKAGE: SMOTE applied to entire dataset first (incorrect approach)
-                    # Apply SMOTE to the entire dataset (data leakage)
-                    scaler = StandardScaler()
-                    X_scaled = scaler.fit_transform(train_data)
-                    
-                    smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
-                    X_smote, y_smote = smote.fit_resample(X_scaled, train_target)
-                    
-                    # Convert back to DataFrame for consistency
-                    X_smote_df = pd.DataFrame(X_smote, columns=train_data.columns)
-                    
-                    # Now apply cross-validation on the SMOTE-processed data
-                    pipeline_leak = Pipeline([
-                        ('classifier', estimator)
-                    ])
-                    
-                    cv_scores_leak_all.append(
-                        make_dict_mean(
-                            df['target'].nunique(),
-                            cross_validate(pipeline_leak, X_smote_df, y_smote, 
-                                         cv=cv, scoring=scoring, return_train_score=False)
+                        # WITH LEAKAGE: SMOTE applied to entire dataset first (incorrect approach)
+                        # Apply SMOTE to the entire dataset (data leakage)
+                        scaler = StandardScaler()
+                        X_scaled = scaler.fit_transform(train_data)
+                        
+                        smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
+                        X_smote, y_smote = smote.fit_resample(X_scaled, train_target)
+                        
+                        # Convert back to DataFrame for consistency
+                        X_smote_df = pd.DataFrame(X_smote, columns=train_data.columns)
+                        
+                        # Now apply cross-validation on the SMOTE-processed data
+                        pipeline_leak = Pipeline([
+                            ('classifier', estimator)
+                        ])
+                        
+                        cv_scores_leak_all.append(
+                            make_dict_mean(
+                                df['target'].nunique(),
+                                cross_validate(pipeline_leak, X_smote_df, y_smote, 
+                                            cv=cv, scoring=scoring, return_train_score=False)
+                            )
                         )
-                    )
 
-                    # Extract accuracy scores
-                    cv_scores_noleak[i] = cv_scores_noleak_all[i]["test_accuracy"]
-                    cv_scores_leak[i] = cv_scores_leak_all[i]["test_accuracy"]
+                        # Extract accuracy scores
+                        cv_scores_noleak[i] = cv_scores_noleak_all[i]["test_accuracy"]
+                        cv_scores_leak[i] = cv_scores_leak_all[i]["test_accuracy"]
 
-                    # Add metadata
-                    cv_scores_leak_all[i]["ds"] = ds
-                    cv_scores_leak_all[i]["iteration"] = i
-                    cv_scores_leak_all[i]["alg"] = alg
-                    cv_scores_leak_all[i]["leak"] = True
-                    cv_scores_leak_all[i]["minority_class_ratio"] = min_class_ratio
-                    cv_scores_leak_all[i]["imbalance_scenario"] = scenario['name']
+                        # Add metadata
+                        cv_scores_leak_all[i]["ds"] = ds
+                        cv_scores_leak_all[i]["iteration"] = i
+                        cv_scores_leak_all[i]["alg"] = alg
+                        cv_scores_leak_all[i]["leak"] = True
+                        cv_scores_leak_all[i]["minority_class_ratio"] = min_class_ratio
+                        cv_scores_leak_all[i]["imbalance_scenario"] = scenario['name']
 
-                    cv_scores_noleak_all[i]["ds"] = ds
-                    cv_scores_noleak_all[i]["iteration"] = i
-                    cv_scores_noleak_all[i]["alg"] = alg
-                    cv_scores_noleak_all[i]["leak"] = False
-                    cv_scores_noleak_all[i]["minority_class_ratio"] = min_class_ratio
-                    cv_scores_noleak_all[i]["imbalance_scenario"] = scenario['name']
+                        cv_scores_noleak_all[i]["ds"] = ds
+                        cv_scores_noleak_all[i]["iteration"] = i
+                        cv_scores_noleak_all[i]["alg"] = alg
+                        cv_scores_noleak_all[i]["leak"] = False
+                        cv_scores_noleak_all[i]["minority_class_ratio"] = min_class_ratio
+                        cv_scores_noleak_all[i]["imbalance_scenario"] = scenario['name']
 
-                    # Combine results
-                    df_temp = pd.DataFrame([cv_scores_leak_all[i], cv_scores_noleak_all[i]])
-                    df_smote = pd.concat([df_smote, df_temp], ignore_index=True)
+                        # Combine results
+                        df_temp = pd.DataFrame([cv_scores_leak_all[i], cv_scores_noleak_all[i]])
+                        df_smote = pd.concat([df_smote, df_temp], ignore_index=True)
 
-                    print(f"CV scores (with data leakage) {alg} in {ds}: {cv_scores_leak[i]:.4f}")
-                    print(f"CV scores (without data leakage) {alg} in {ds}: {cv_scores_noleak[i]:.4f}")
-                    
-                    # Save results after each iteration
-                    df_smote.to_csv(f"smote_results{suffix}.csv", index=False)
+                        print(f"CV scores (with data leakage) {alg} in {ds}: {cv_scores_leak[i]:.4f}")
+                        print(f"CV scores (without data leakage) {alg} in {ds}: {cv_scores_noleak[i]:.4f}")
+                        
+                        # Save results after each iteration
+                        df_smote.to_csv(f"smote_results{suffix}.csv", index=False)
+                        gc.collect()
 
             except Exception as e:
                 print(f"FATAL ERROR processing dataset {ds} with scenario {scenario['name']}: {e}")

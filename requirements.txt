@@ -36,3 +36,6 @@ xgboost==2.0.3
 imbalanced-learn==0.14.0
 tzdata==2025.2
 urllib3==2.4.0
+boto3
+
+

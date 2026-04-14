@@ -10,6 +10,7 @@ from sklearn.feature_selection import SelectPercentile
 from sklearn.impute import SimpleImputer, KNNImputer
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
+import gc
 
 
 def get_simplified_param_grid(alg):
@@ -43,7 +44,15 @@ def get_simplified_param_grid(alg):
                             'subsample': [0.8, 1.0]
                           }
     }
-    return param_grids.get(alg, {})
+    # Get the base grid for the algorithm
+    base_grid = param_grids.get(alg, {})
+    
+    # Add 'classifier__' prefix to each parameter
+    pipeline_grid = {}
+    for param, values in base_grid.items():
+        pipeline_grid[f'classifier__{param}'] = values
+    
+    return pipeline_grid
 
 
 def run_worst_case_leakage_test():
@@ -59,7 +68,7 @@ def run_worst_case_leakage_test():
     """
     print("WORST CASE DATA LEAKAGE TEST")
     print("Testing scenario where ALL preprocessing steps leak data vs doing everything correctly")
-    target_ds_list = ds_list
+    target_ds_list = ["shuttle"] #ds_list + additional_15_ds
     print("Datasets to be used: ", target_ds_list)
 
     df_worst_case = pd.DataFrame()
@@ -90,7 +99,7 @@ def run_worst_case_leakage_test():
             print(f"Feature selection: top {FEATURE_SELECTION_PERCENTAGE}%")
             
             scoring = get_scoring(df_with_missing['target'].nunique())
-            target_algorithms = new_algorithms
+            target_algorithms = [ "XGB", "NN"] # new_algorithms
             
             for alg in target_algorithms:
                 print(f"\nalg: {alg}")
@@ -115,14 +124,17 @@ def run_worst_case_leakage_test():
                     # Calculate parameters for SMOTE
                     class_counts = df_with_missing['target'].value_counts()
                     min_class_size = min(class_counts)
-                    k_neighbors = min(5, max(1, min_class_size - 1))
+                    k_neighbors = 2 #int(min(5, min_class_size / 2))
+                    if k_neighbors <= 0:
+                        k_neighbors =1
+                    print(k_neighbors)
                     
                     # =================================================================
                     # CORRECT APPROACH: All preprocessing within CV folds
                     # =================================================================
                     
                     pipeline_correct = ImbPipeline([
-                        ('imputer', KNNImputer(n_neighbors=5)),
+                        ('imputer', SimpleImputer(strategy='median')),
                         ('scaler', StandardScaler()),
                         ('feature_selector', SelectPercentile(percentile=FEATURE_SELECTION_PERCENTAGE)),
                         ('smote', SMOTE(random_state=42, k_neighbors=k_neighbors)),
@@ -165,7 +177,7 @@ def run_worst_case_leakage_test():
                     # =================================================================
                     
                     # Step 1: Impute missing values using entire dataset (LEAKAGE)
-                    imputer = KNNImputer(n_neighbors=5)
+                    imputer = SimpleImputer(strategy='median')
                     X_imputed = imputer.fit_transform(train_data)
                     X_imputed_df = pd.DataFrame(X_imputed, columns=train_data.columns)
                     
@@ -186,12 +198,10 @@ def run_worst_case_leakage_test():
                     X_selected = feature_selector.fit_transform(X_scaled_df, train_target)
                     
                     # Step 4: Apply SMOTE using entire dataset (LEAKAGE)
-                    if X_selected.shape[0] > k_neighbors:  # Only apply SMOTE if we have enough samples
-                        smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
-                        X_smote, y_smote = smote.fit_resample(X_selected, train_target)
-                    else:
-                        print(f"    Skipping SMOTE: not enough samples ({X_selected.shape[0]} <= {k_neighbors})")
-                        X_smote, y_smote = X_selected, train_target
+                    
+                    smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
+                    X_smote, y_smote = smote.fit_resample(X_selected, train_target)
+
                     
                     # Step 5: Hyperparameter tuning using entire preprocessed dataset (LEAKAGE)
                     pipeline_leakage = Pipeline([
@@ -202,23 +212,12 @@ def run_worst_case_leakage_test():
                     
                     if param_grid:
                         # WORST CASE: Hyperparameter tuning on entire preprocessed dataset
-                        grid_search_leakage = GridSearchCV(
-                            pipeline_leakage, param_grid,
+                        clf = GridSearchCV(pipeline_leakage, param_grid,
                             cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=i),
-                            scoring='accuracy', refit=True
-                        )
-                        
-                        # Fit grid search on entire preprocessed dataset (MASSIVE LEAKAGE)
-                        grid_search_leakage.fit(X_smote, y_smote)
-                        
-                        # Then evaluate the best model with CV (but data is already leaked)
-                        cv_scores_leak_all.append(
-                            make_dict_mean(
-                                df_with_missing['target'].nunique(),
-                                cross_validate(grid_search_leakage.best_estimator_, X_smote, y_smote, 
-                                             cv=cv, scoring=scoring, return_train_score=False)
-                            )
-                        )
+                            scoring=scoring, refit='accuracy')
+                        clf.fit(X_selected, train_target)
+                        clf_results = make_dict(df_with_missing['target'].nunique(),clf.cv_results_)
+                        cv_scores_leak_all.append(clf_results)
                     else:
                         # No hyperparameter tuning for this algorithm
                         cv_scores_leak_all.append(
@@ -262,6 +261,7 @@ def run_worst_case_leakage_test():
                     
                     # Save results after each iteration
                     df_worst_case.to_csv(f"worst_case_leakage_results{suffix}.csv", index=False)
+                    gc.collect()
 
         except Exception as e:
             print(f"FATAL ERROR processing dataset {ds}: {e}")

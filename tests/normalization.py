@@ -11,7 +11,7 @@ from pmlb import fetch_data
 
 def run_normalization_test():
     print("Normalization")
-    target_ds_list = ds_list
+    target_ds_list = ["mushroom"] #ds_list
     print("Datasets to be used: ", target_ds_list)
     
     df_norm = pd.DataFrame()
@@ -20,7 +20,7 @@ def run_normalization_test():
 
       df = fetch_data(ds)
 
-      target_algorithms = new_algorithms
+      target_algorithms = ["KNN"]#new_algorithms
       for alg in target_algorithms:
         print("alg: ",alg)
         estimator = get_estimator(alg)

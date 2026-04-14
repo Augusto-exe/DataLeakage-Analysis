@@ -73,15 +73,15 @@ print("Starting model script...")
 target_algorithms = ["KNN",  "LR", "NB","DT", "RF", "SVC"] #
 
 # New algorithms for additional testing
-new_algorithms = ["XGB", "NN"]
+new_algorithms = ["KNN",  "LR", "NB","DT", "RF", "SVC","XGB", "NN"]
 
 sub_ds_list = ["GAMETES_Epistasis_2_Way_1000atts_0.4H_EDM_1_EDM_1_1","agaricus_lepiota","mushroom","ring","twonorm"]
 partial_ds = ["waveform_40","waveform_21","movement_libras","satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
 #ds_list = ["optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
 #ds_list = ["GAMETES_Epistasis_2_Way_1000atts_0.4H_EDM_1_EDM_1_1","agaricus_lepiota","mushroom","ring","twonorm","clean1","dna","phoneme","mfeat_pixel","banana","mfeat_factors","spambase","Hill_Valley_with_noise","Hill_Valley_without_noise","waveform_40","waveform_21","movement_libras","satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]
 additional_15_ds =  ["mnist", "poker", "kddcup","clean2", "coil2000", "connect_4", "sleep", "fars", "adult", "spectf", "shuttle", "magic", "letter", "krkopt", "dis"]
-
-ds_list =["kddcup","clean2", "coil2000", "connect_4", "sleep", "fars", "adult", "spectf", "shuttle", "magic", "letter", "krkopt", "dis"]
+ds_list =[ "fars", "adult", "spectf", "shuttle", "magic", "letter", "krkopt", "dis"] #["poker"]
+#ds_list =["kddcup"] #"clean2", "coil2000", "connect_4", "sleep", "fars", "adult", "spectf", "shuttle", "magic", "letter", "krkopt", "dis","mnist", "poker", 
 #additional_15_ds
 #["mnist", "poker", "kddcup",
 new_list = ["satimage","chess","kr_vs_kp","optdigits","splice","texture","sonar","molecular_biology_promoters","mfeat_fourier","analcatdata_authorship","tokyo1","soybean","mfeat_karhunen"]

@@ -23,7 +23,7 @@ python3 -W ignore main.py tuning
 # echo "Running SMOTE test..."
 # python3 main.py smote
 
-# echo "Running worst case leakage test..."
-# python3 main.py worst_case
+#echo "Running worst case leakage test..."
+#python3 main.py worst_case
 
 echo "All tests completed."
