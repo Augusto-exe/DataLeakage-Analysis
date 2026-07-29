@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 
 def run_value_imputation_test():
     print("Value Imputation")
-    target_ds_list = additional_15_ds
+    target_ds_list = ds_list
     print("Datasets to be used: ", target_ds_list)
 
     df_impute = pd.DataFrame()
@@ -23,6 +23,7 @@ def run_value_imputation_test():
         cv = StratifiedKFold(n_splits=5,shuffle = True, random_state=42 )
         df = insert_missing_in_df(fetch_data(ds),p)
         scoring = get_scoring(df['target'].nunique())
+        target_algorithms = new_algorithms
         for alg in target_algorithms:
           print("alg: ",alg)
 
@@ -87,4 +88,4 @@ def run_value_imputation_test():
               df_temp = pd.DataFrame([cv_scores_leak_all[i],cv_scores_noleak_all[i]])
               df_impute  = pd.concat([df_impute ,df_temp], ignore_index=True)
 
-              df_impute.to_csv("imputation_results.csv", index=False)
+              df_impute.to_csv("imputation_results"+suffix+".csv", index=False)

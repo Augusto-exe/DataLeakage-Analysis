@@ -11,15 +11,16 @@ from pmlb import fetch_data
 
 def run_normalization_test():
     print("Normalization")
-    target_ds_list = additional_15_ds
+    target_ds_list = ["mushroom"] #ds_list
     print("Datasets to be used: ", target_ds_list)
-
+    
     df_norm = pd.DataFrame()
     for ds in target_ds_list:
       print("\n TESTING ds: _", ds, "_\n")
 
       df = fetch_data(ds)
 
+      target_algorithms = ["KNN"]#new_algorithms
       for alg in target_algorithms:
         print("alg: ",alg)
         estimator = get_estimator(alg)
@@ -75,4 +76,4 @@ def run_normalization_test():
           df_temp = pd.DataFrame([cv_scores_leak_all[i],cv_scores_noleak_all[i]])
           df_norm = pd.concat([df_norm,df_temp], ignore_index=True)
 
-          df_norm.to_csv("normalization_results.csv", index=False)
+          df_norm.to_csv("normalization_results"+suffix+".csv", index=False)
